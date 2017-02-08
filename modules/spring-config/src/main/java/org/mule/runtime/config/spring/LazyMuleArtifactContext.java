@@ -97,12 +97,13 @@ public class LazyMuleArtifactContext extends MuleArtifactContext implements Lazy
     }
   }
 
+  /**
+   * During a lazy intialization of an artifact the components should not be created.
+   */
   @Override
   protected void createInitialApplicationComponents(DefaultListableBeanFactory beanFactory,
                                                     BeanDefinitionReader beanDefinitionReader) {
-    if (useNewParsingMechanism) {
-      createComponents(beanFactory, applicationModel, true);
-    } else {
+    if (!useNewParsingMechanism) {
       throw new MuleRuntimeException(createStaticMessage("Could not create mule application since lazy init is enabled but there are component in the configuration "
           +
           "that are not parsed with the new mechanism " + getOldParsingMechanismComponentIdentifiers()));
