@@ -6,35 +6,82 @@
  */
 package org.mule.runtime.core.internal.locator;
 
-import org.mule.runtime.api.component.location.ComponentLocation;
+import static java.lang.String.format;
+import org.mule.runtime.core.api.MuleContext;
+import org.mule.runtime.core.api.construct.Flow;
+import org.mule.runtime.core.api.exception.ObjectNotFoundException;
 import org.mule.runtime.core.api.locator.ConfigurationComponentLocator;
-import org.mule.runtime.core.api.locator.Location;
+import org.mule.runtime.core.api.processor.Processor;
+import org.mule.runtime.core.util.ArrayUtils;
 
-import java.util.Map;
-import java.util.Optional;
+import java.util.List;
 
-import org.apache.commons.collections.map.HashedMap;
+import javax.inject.Inject;
 
 /**
- * Default implementation of {@link ConfigurationComponentLocator}.
- * 
- * An instance of {@link DefaultConfigurationComponentLocator} is created with all the components and it's location injected via
- * the {@code {@link #setComponentMap(Map)}} method.
+ * Default implementation of {@link ConfigurationComponentLocator}
  *
  * @since 4.0
  */
 public class DefaultConfigurationComponentLocator implements ConfigurationComponentLocator {
 
-  private Map<ComponentLocation, Object> componentMap = new HashedMap();
+  private final MuleContext muleContext;
 
-  public Optional<Object> find(Location location) {
-    return componentMap.entrySet().stream()
-        .filter(entry -> entry.getKey().getLocation().equals(location.toString()))
-        .map(entry -> entry.getValue())
-        .findAny();
+  @Inject
+  public DefaultConfigurationComponentLocator(MuleContext muleContext) {
+    this.muleContext = muleContext;
   }
 
-  public void setComponentMap(Map<ComponentLocation, Object> componentMap) {
-    this.componentMap = componentMap;
+  @Override
+  public Object findByName(String name) throws ObjectNotFoundException {
+    Object object = muleContext.getRegistry().lookupObject(name);
+    validateObjectIsPresent(name, object);
+    return object;
+  }
+
+  private void validateObjectIsPresent(String name, Object object) {
+    if (object == null) {
+      throw new ObjectNotFoundException(name);
+    }
+  }
+
+  //TODO MULE-10751 - add complete support for componentPath
+  @Override
+  public Object findByPath(String componentPath) {
+    String[] parts = componentPath.split("/");
+    if (parts.length == 0) {
+      throw new IllegalArgumentException("Incomplete component path " + componentPath);
+    }
+    String type = parts[0];
+    if (!"flow".equals(type)) {
+      throw new IllegalArgumentException("Unsupported component type " + type);
+    }
+    if (parts.length == 1) {
+      throw new IllegalArgumentException("Missing component path type element name in " + componentPath);
+    }
+    String typeElementName = parts[1];
+    Flow flow = (Flow) muleContext.getRegistry().lookupFlowConstruct(typeElementName);
+    validateObjectIsPresent(typeElementName, flow);
+    if (parts.length == 2) {
+      return flow;
+    }
+    String flowPartType = parts[2];
+    if ("source".equals(flowPartType)) {
+      return flow.getMessageSource();
+    }
+    if ("processors".equals(flowPartType)) {
+      return resolveMessageProcessor(flow.getMessageProcessors(), ArrayUtils.subarray(parts, 4, parts.length - 1));
+    }
+    if ("errorHandler".equals(flowPartType)) {
+      throw new IllegalArgumentException("Cannot resolve processors inside error-handler yet");
+    }
+    throw new IllegalArgumentException(format("Flow part %s is invalid", flowPartType));
+  }
+
+  private Object resolveMessageProcessor(List<Processor> messageProcessors, Object[] processorIndexes) {
+    if (processorIndexes.length > 1) {
+      throw new IllegalArgumentException("Only one level of processor indexes is supported");
+    }
+    return messageProcessors.get(Integer.valueOf((String) processorIndexes[0]));
   }
 }

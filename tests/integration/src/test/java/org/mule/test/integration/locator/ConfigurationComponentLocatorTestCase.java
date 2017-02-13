@@ -6,19 +6,15 @@
  */
 package org.mule.test.integration.locator;
 
-import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsInstanceOf.instanceOf;
 import static org.junit.Assert.assertThat;
-import static org.mule.runtime.core.api.locator.Location.builder;
 import org.mule.runtime.core.api.construct.Flow;
-import org.mule.runtime.core.api.locator.Location;
+import org.mule.runtime.core.api.exception.ObjectNotFoundException;
 import org.mule.runtime.core.api.processor.LoggerMessageProcessor;
 import org.mule.runtime.core.api.source.MessageSource;
 import org.mule.runtime.core.processor.AsyncDelegateMessageProcessor;
 import org.mule.runtime.core.processor.simple.SetPayloadMessageProcessor;
 import org.mule.test.AbstractIntegrationTestCase;
-
-import java.util.Optional;
 
 import org.junit.Test;
 
@@ -29,54 +25,47 @@ public class ConfigurationComponentLocatorTestCase extends AbstractIntegrationTe
     return "org/mule/test/integration/locator/component-locator-config.xml";
   }
 
-  @Test
+  @Test(expected = ObjectNotFoundException.class)
   public void globalObjectNotFound() {
-    assertThat(muleContext.getConfigurationComponentLocator().find(builder().globalName("nonExistent").build()).isPresent(),
-               is(false));
+    muleContext.getConfigurationComponentLocator().findByName("nonExistent");
   }
 
-  @Test
   public void globalObjectFound() {
-    Optional<Object> myFlow =
-        muleContext.getConfigurationComponentLocator().find(builder().globalName("myFlow").build());
-    assertThat(myFlow.isPresent(), is(true));
-    assertThat(myFlow.get(), instanceOf(Flow.class));
+    Object flow = muleContext.getConfigurationComponentLocator().findByName("myFlow");
+    assertThat(flow, instanceOf(Flow.class));
   }
 
-  @Test
+  @Test(expected = IllegalArgumentException.class)
   public void badContainerType() {
-    Location location = builder().globalName("pepe").addProcessorsPart().addIndexPart(0).build();
-    assertThat(muleContext.getConfigurationComponentLocator().find(location).isPresent(), is(false));
+    muleContext.getConfigurationComponentLocator().findByPath("pepe/processors/0");
   }
 
-  @Test
+  @Test(expected = IllegalArgumentException.class)
+  public void badContainerPart() {
+    muleContext.getConfigurationComponentLocator().findByPath("flow/myFlow/inputPhase");
+  }
+
+  @Test(expected = ObjectNotFoundException.class)
+  public void badContainerName() {
+    muleContext.getConfigurationComponentLocator().findByPath("flow/notExistentFlow");
+  }
+
+  public void flowByPath() {
+    Object flow = muleContext.getConfigurationComponentLocator().findByPath("flow/myFlow");
+    assertThat(flow, instanceOf(Flow.class));
+  }
+
   public void sourceByPath() {
-    Location sourceLocation = builder().globalName("myFlow").addPart("source").build();
-    Optional<Object> source = muleContext.getConfigurationComponentLocator().find(sourceLocation);
-    assertThat(source.isPresent(), is(true));
-    assertThat(source.get(), instanceOf(MessageSource.class));
+    Object source = muleContext.getConfigurationComponentLocator().findByPath("flow/myFlow/source");
+    assertThat(source, instanceOf(MessageSource.class));
   }
 
-  @Test
   public void messageProcessorByPath() {
-    Location.Builder myFlowProcessorsLocationBuilder = builder().globalName("myFlow").addProcessorsPart();
-    Optional<Object> processor =
-        muleContext.getConfigurationComponentLocator().find(myFlowProcessorsLocationBuilder.addIndexPart(0).build());
-    assertThat(processor.isPresent(), is(true));
-    assertThat(processor.get(), instanceOf(LoggerMessageProcessor.class));
-    processor = muleContext.getConfigurationComponentLocator().find(myFlowProcessorsLocationBuilder.addIndexPart(1).build());
-    assertThat(processor.isPresent(), is(true));
-    assertThat(processor.get(), instanceOf(SetPayloadMessageProcessor.class));
-    processor = muleContext.getConfigurationComponentLocator().find(myFlowProcessorsLocationBuilder.addIndexPart(2).build());
-    assertThat(processor.isPresent(), is(true));
-    assertThat(processor.get(), instanceOf(AsyncDelegateMessageProcessor.class));
-    processor = muleContext.getConfigurationComponentLocator()
-        .find(myFlowProcessorsLocationBuilder.addIndexPart(2).addProcessorsPart().addIndexPart(0).build());
-    assertThat(processor.isPresent(), is(true));
-    assertThat(processor.get(), instanceOf(SetPayloadMessageProcessor.class));
-    processor = muleContext.getConfigurationComponentLocator()
-        .find(myFlowProcessorsLocationBuilder.addIndexPart(2).addProcessorsPart().addIndexPart(1).build());
-    assertThat(processor.isPresent(), is(true));
-    assertThat(processor.get(), instanceOf(LoggerMessageProcessor.class));
+    Object processor = muleContext.getConfigurationComponentLocator().findByPath("flow/myFlow/processors/0");
+    assertThat(processor, instanceOf(LoggerMessageProcessor.class));
+    processor = muleContext.getConfigurationComponentLocator().findByPath("flow/myFlow/processors/1");
+    assertThat(processor, instanceOf(SetPayloadMessageProcessor.class));
+    processor = muleContext.getConfigurationComponentLocator().findByPath("flow/myFlow/processors/2");
+    assertThat(processor, instanceOf(AsyncDelegateMessageProcessor.class));
   }
 }

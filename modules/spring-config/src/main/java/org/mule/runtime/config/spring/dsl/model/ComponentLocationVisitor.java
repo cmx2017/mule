@@ -36,8 +36,6 @@ import java.util.stream.Collectors;
  */
 public class ComponentLocationVisitor implements Consumer<ComponentModel> {
 
-  private static final String PROCESSORS_PART_NAME = "processors";
-
   /**
    * For every {@link ComponentModel} in the configuration, sets the {@link DefaultComponentLocation} associated within an
    * annotation under the key {@link org.mule.runtime.api.meta.AbstractAnnotatedObject#LOCATION_KEY}.
@@ -74,9 +72,8 @@ public class ComponentLocationVisitor implements Consumer<ComponentModel> {
         componentLocation = processOnErrorModel(componentModel, parentComponentLocation, typedComponentIdentifier);
       } else if (isProcessor(componentModel)) {
         componentLocation =
-            parentComponentLocation.appendLocationPart(PROCESSORS_PART_NAME, empty(), empty(), empty())
-                .appendLocationPart(findProcessorPath(componentModel), typedComponentIdentifier,
-                                    componentModel.getConfigFileName(), componentModel.getLineNumber());
+            parentComponentLocation.appendLocationPart(findProcessorPath(componentModel), typedComponentIdentifier,
+                                                       componentModel.getConfigFileName(), componentModel.getLineNumber());
       } else {
         componentLocation =
             parentComponentLocation.appendLocationPart(findNonProcessorPath(componentModel), typedComponentIdentifier,
@@ -134,7 +131,7 @@ public class ComponentLocationVisitor implements Consumer<ComponentModel> {
                                                      componentModel.getLineNumber());
     } else if (isProcessor(componentModel)) {
       componentLocation =
-          parentComponentLocation.appendLocationPart(PROCESSORS_PART_NAME, empty(), empty(), empty())
+          parentComponentLocation.appendLocationPart("processors", empty(), empty(), empty())
               .appendLocationPart(findProcessorPath(componentModel),
                                   typedComponentIdentifier,
                                   componentModel.getConfigFileName(), componentModel.getLineNumber());
